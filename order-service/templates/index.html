@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Delivery Microservices Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .status-pulse { animation: pulse-subtle 2s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased">
+
+  <!-- Top Navbar -->
+  <nav class="bg-slate-800/80 backdrop-blur border-b border-slate-700/80 sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
+          <i class="fa-solid fa-burger text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            SwiftEats <span class="text-xs bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-full font-medium">Cloud Microservices</span>
+          </h1>
+          <p class="text-xs text-slate-400">Dockerized Food Delivery & Orchestration Engine</p>
+        </div>
+      </div>
+
+      <!-- Real-time Service Health Pills -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <div id="status-order" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700/60 border border-slate-600 text-xs">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 status-pulse"></span>
+          <span class="text-slate-300">Order (:5000)</span>
+        </div>
+        <div id="status-restaurant" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700/60 border border-slate-600 text-xs">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 status-pulse"></span>
+          <span class="text-slate-300">Restaurant (:5001)</span>
+        </div>
+        <div id="status-delivery" class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700/60 border border-slate-600 text-xs">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 status-pulse"></span>
+          <span class="text-slate-300">Delivery (:5002)</span>
+        </div>
+        <button onclick="refreshData()" class="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition text-xs flex items-center gap-1">
+          <i class="fa-solid fa-rotate text-xs"></i> Refresh
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- Interactive Architecture Banner -->
+    <div class="bg-gradient-to-r from-slate-800 to-slate-800/60 border border-slate-700 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+      <div class="absolute -right-10 -bottom-10 opacity-5 pointer-events-none">
+        <i class="fa-solid fa-network-wired text-9xl"></i>
+      </div>
+      <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div>
+          <span class="text-xs uppercase tracking-wider text-amber-400 font-semibold">Inter-Service Orchestration</span>
+          <h2 class="text-2xl font-extrabold text-white mt-1">Multi-Container Microservice Architecture</h2>
+          <p class="text-sm text-slate-300 mt-1 max-w-2xl">
+            When you place a food order, <span class="text-rose-400 font-medium">Order Service</span> validates the payload, queries <span class="text-amber-400 font-medium">Restaurant Service</span> via internal Docker DNS to reserve kitchen inventory, and dispatches a rider via <span class="text-cyan-400 font-medium">Delivery Service</span>.
+          </p>
+        </div>
+        <div class="flex items-center gap-3 bg-slate-900/80 p-3 rounded-xl border border-slate-700/80">
+          <div class="text-center px-3">
+            <span class="block text-2xl font-bold text-white" id="stat-total-orders">0</span>
+            <span class="text-[11px] text-slate-400 uppercase tracking-wide">Orders Placed</span>
+          </div>
+          <div class="w-px h-8 bg-slate-700"></div>
+          <div class="text-center px-3">
+            <span class="block text-2xl font-bold text-emerald-400" id="stat-success-rate">100%</span>
+            <span class="text-[11px] text-slate-400 uppercase tracking-wide">Success Rate</span>
+          </div>
+          <div class="w-px h-8 bg-slate-700"></div>
+          <div class="text-center px-3">
+            <span class="block text-2xl font-bold text-cyan-400" id="stat-avg-latency">-- ms</span>
+            <span class="text-[11px] text-slate-400 uppercase tracking-wide">Last Latency</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Grid: Place Order & Live Response -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+      <!-- Order Placement Form (1 col) -->
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-cart-plus text-rose-400"></i> Place Food Order
+            </h3>
+            <span class="text-xs text-slate-400">POST /orders</span>
+          </div>
+
+          <form id="orderForm" onsubmit="submitOrder(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Customer Name</label>
+              <input type="text" id="custName" value="Alex Morgan" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Select Menu Item</label>
+              <select id="menuSelect" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500">
+                <option value="1">Artisanal Margherita Pizza - $14.99</option>
+                <option value="2" selected>Royal Chicken Dum Biryani - $16.50</option>
+                <option value="3">Double Smash Cheddar Burger - $12.25</option>
+                <option value="4">Salmon Nigiri & Dragon Roll Set - $19.99</option>
+                <option value="5">Mediterranean Quinoa Bowl - $11.50</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Quantity</label>
+                <input type="number" id="custQty" min="1" max="10" value="2" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Payment Method</label>
+                <input type="text" value="Credit Card" disabled class="w-full bg-slate-900/60 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-400 cursor-not-allowed">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Delivery Address</label>
+              <input type="text" id="custAddress" value="450 Tech Avenue, Block B" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500">
+            </div>
+
+            <button type="submit" id="submitBtn" class="w-full mt-4 bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg shadow-rose-500/20 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-paper-plane"></i> Place Order (Trigger Orchestration)
+            </button>
+          </form>
+        </div>
+
+        <div class="mt-4 pt-4 border-t border-slate-700 text-xs text-slate-400 flex items-center justify-between">
+          <span>Target URL: <code class="text-rose-400">POST /orders</code></span>
+          <span class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-bolt"></i> Live API</span>
+        </div>
+      </div>
+
+      <!-- Live Order Confirmation Card (2 cols) -->
+      <div class="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-receipt text-amber-400"></i> Live Orchestration Result
+            </h3>
+            <span id="orderResultBadge" class="text-xs bg-slate-700 text-slate-300 px-3 py-1 rounded-full font-medium">Waiting for action...</span>
+          </div>
+
+          <div id="emptyResultPlaceholder" class="border-2 border-dashed border-slate-700 rounded-xl p-10 text-center text-slate-500 my-4">
+            <i class="fa-solid fa-utensils text-4xl mb-3 opacity-30"></i>
+            <p class="text-sm">Submit an order using the form on the left to watch live inter-service orchestration happen across containers.</p>
+          </div>
+
+          <!-- Result Container (Hidden initially) -->
+          <div id="orderResultContainer" class="hidden space-y-4">
+            <!-- Order Header -->
+            <div class="bg-slate-900/90 rounded-xl p-4 border border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <span class="text-xs text-slate-400">Order Identifier</span>
+                <div class="text-xl font-mono font-bold text-emerald-400" id="res-order-id">FOOD-XXXXXX</div>
+              </div>
+              <div class="flex gap-2">
+                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                  <i class="fa-solid fa-circle-check"></i> <span id="res-status">CONFIRMED</span>
+                </span>
+                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
+                  <i class="fa-solid fa-clock"></i> <span id="res-latency">45 ms</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- Details Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60">
+                <span class="text-[11px] text-slate-400 block"><i class="fa-solid fa-shop text-amber-400 mr-1"></i> Restaurant</span>
+                <span class="text-sm font-semibold text-white block mt-0.5" id="res-restaurant">Spice Route Kitchen</span>
+                <span class="text-xs text-slate-400 block" id="res-item">Biryani x 2</span>
+              </div>
+              <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60">
+                <span class="text-[11px] text-slate-400 block"><i class="fa-solid fa-motorcycle text-cyan-400 mr-1"></i> Assigned Rider</span>
+                <span class="text-sm font-semibold text-white block mt-0.5" id="res-rider">Marcus Chen</span>
+                <span class="text-xs text-cyan-400 block" id="res-eta">ETA: 30 Mins</span>
+              </div>
+              <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-700/60">
+                <span class="text-[11px] text-slate-400 block"><i class="fa-solid fa-money-bill-wave text-emerald-400 mr-1"></i> Total Billed</span>
+                <span class="text-sm font-semibold text-emerald-300 block mt-0.5" id="res-total">$38.99</span>
+                <span class="text-xs text-slate-400 block" id="res-fee">Fee: $4.50</span>
+              </div>
+            </div>
+
+            <!-- Inter-service Trace Log -->
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-xs text-slate-400 space-y-1">
+              <div class="text-slate-500 font-semibold mb-1">Inter-Service Container Communication Trace:</div>
+              <div class="text-slate-300">✓ <span class="text-purple-400">Client</span> &rarr; HTTP POST <code>http://order-service:5000/orders</code></div>
+              <div class="text-slate-300">✓ <span class="text-purple-400">Order Service</span> &rarr; HTTP POST <code>http://restaurant-service:5001/menu/reserve</code> [Stock Verified]</div>
+              <div class="text-slate-300">✓ <span class="text-purple-400">Order Service</span> &rarr; HTTP POST <code>http://delivery-service:5002/deliveries/assign</code> [Rider Dispatched]</div>
+              <div class="text-emerald-400">✓ <span class="text-purple-400">Order Service</span> &rarr; Committed to SQLite & Dispatched Receipt to Client</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-700 text-xs text-slate-500 flex items-center justify-between">
+          <span>Bridge Network: <code class="text-slate-400">fooddelivery-network</code></span>
+          <span>DNS: <code class="text-slate-400">Docker Embedded DNS</code></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Orders History Table -->
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-database text-cyan-400"></i> Persisted Orders Ledger (SQLite)
+          </h3>
+          <p class="text-xs text-slate-400">Real-time records stored in Order Service database</p>
+        </div>
+        <button onclick="fetchOrders()" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 transition">
+          <i class="fa-solid fa-arrows-rotate"></i> Reload Table
+        </button>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-slate-700">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-900/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-700">
+            <tr>
+              <th class="px-4 py-3">Order ID</th>
+              <th class="px-4 py-3">Customer</th>
+              <th class="px-4 py-3">Restaurant</th>
+              <th class="px-4 py-3">Item & Qty</th>
+              <th class="px-4 py-3">Rider Assigned</th>
+              <th class="px-4 py-3">ETA</th>
+              <th class="px-4 py-3">Total</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Latency</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody" class="divide-y divide-slate-700/60 font-mono text-slate-300">
+            <tr>
+              <td colspan="9" class="px-4 py-6 text-center text-slate-500">Loading orders...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- JavaScript to interact with APIs -->
+  <script>
+    async function checkHealth() {
+      try {
+        const res = await fetch('/health');
+        if (res.ok) {
+          document.getElementById('status-order').classList.add('border-emerald-500/40');
+        }
+      } catch (e) {}
+    }
+
+    async function fetchOrders() {
+      try {
+        const res = await fetch('/orders');
+        const data = await res.json();
+        const tbody = document.getElementById('ordersTableBody');
+        tbody.innerHTML = '';
+
+        document.getElementById('stat-total-orders').innerText = data.total_orders || 0;
+
+        if (!data.orders || data.orders.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-slate-500">No orders placed yet. Submit the form above to add an order!</td></tr>';
+          return;
+        }
+
+        data.orders.forEach(order => {
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-700/30 transition";
+          tr.innerHTML = `
+            <td class="px-4 py-3 font-semibold text-emerald-400">${order.order_id}</td>
+            <td class="px-4 py-3 font-sans text-white">${order.customer_name}</td>
+            <td class="px-4 py-3 font-sans text-slate-300">${order.restaurant_name}</td>
+            <td class="px-4 py-3 font-sans text-slate-300">${order.item_name} (x${order.quantity})</td>
+            <td class="px-4 py-3 font-sans text-cyan-300">${order.rider_name || 'Assigned'}</td>
+            <td class="px-4 py-3 text-amber-300">${order.eta_minutes}m</td>
+            <td class="px-4 py-3 font-bold text-white">$${order.total_amount.toFixed(2)}</td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">${order.status}</span></td>
+            <td class="px-4 py-3 text-slate-400">${order.latency_ms}ms</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+      }
+    }
+
+    async function submitOrder(e) {
+      e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Orchestrating Microservices...';
+
+      const payload = {
+        customer_name: document.getElementById('custName').value,
+        item_id: parseInt(document.getElementById('menuSelect').value),
+        restaurant_id: parseInt(document.getElementById('menuSelect').value),
+        quantity: parseInt(document.getElementById('custQty').value),
+        delivery_address: document.getElementById('custAddress').value
+      };
+
+      const t0 = performance.now();
+      try {
+        const res = await fetch('/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        const clientLat = Math.round(performance.now() - t0);
+
+        if (res.ok && data.order) {
+          const ord = data.order;
+          document.getElementById('emptyResultPlaceholder').classList.add('hidden');
+          document.getElementById('orderResultContainer').classList.remove('hidden');
+
+          document.getElementById('res-order-id').innerText = ord.order_id;
+          document.getElementById('res-status').innerText = ord.status;
+          document.getElementById('res-latency').innerText = `${ord.latency_ms} ms (Server)`;
+          document.getElementById('res-restaurant').innerText = ord.restaurant_name;
+          document.getElementById('res-item').innerText = `${ord.item_name} x ${ord.quantity}`;
+          document.getElementById('res-rider').innerText = ord.rider_name;
+          document.getElementById('res-eta').innerText = `ETA: ${ord.eta_minutes} Mins`;
+          document.getElementById('res-total').innerText = `$${ord.total_amount.toFixed(2)}`;
+          document.getElementById('res-fee').innerText = `Delivery Fee: $${ord.delivery_fee.toFixed(2)}`;
+
+          document.getElementById('stat-avg-latency').innerText = `${ord.latency_ms} ms`;
+          document.getElementById('orderResultBadge').className = "text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full font-medium";
+          document.getElementById('orderResultBadge').innerText = "Orchestration Succeeded (HTTP 201)";
+
+          fetchOrders();
+        } else {
+          alert("Order error: " + (data.error || "Failed to place order"));
+        }
+      } catch (err) {
+        alert("Network failure communicating with Order Service: " + err);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Place Order (Trigger Orchestration)';
+      }
+    }
+
+    function refreshData() {
+      checkHealth();
+      fetchOrders();
+    }
+
+    // Initial load
+    checkHealth();
+    fetchOrders();
+  </script>
+</body>
+</html>
